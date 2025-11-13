@@ -35,7 +35,7 @@ class LiteLLMClient:
 
         try:
             prompt = prompt_template.replace('{content}', content)
-            print(f"AutoSaveWithAI: Sending {len(content)} characters to LLM")
+            print("AutoSaveWithAI: Sending {} characters to LLM".format(len(content)))
 
             # Prepare completion arguments
             kwargs = {
@@ -54,12 +54,12 @@ class LiteLLMClient:
             print("AutoSaveWithAI: Making API call...")
             response = completion(**kwargs)
             result = response['choices'][0]['message']['content'].strip()
-            print(f"AutoSaveWithAI: LLM responded with: {result}")
+            print("AutoSaveWithAI: LLM responded with: {}".format(result))
             return result
 
         except Exception as e:
             # Catch all exceptions from LiteLLM/API providers
-            print(f"AutoSaveWithAI: LLM API error: {e}")
+            print("AutoSaveWithAI: LLM API error: {}".format(e))
             return None
 
 
@@ -125,7 +125,7 @@ def save_file_with_ai_name(view: sublime.View) -> bool:
         sublime.error_message("AutoSaveWithAI: save_directory not configured in settings")
         return False
 
-    print(f"AutoSaveWithAI: Save directory: {save_dir}")
+    print("AutoSaveWithAI: Save directory: {}".format(save_dir))
 
     # Expand home directory if needed
     save_dir = os.path.expanduser(save_dir)
@@ -145,7 +145,7 @@ def save_file_with_ai_name(view: sublime.View) -> bool:
 
     # Get LLM settings
     llm_model = settings.get("llm_model", "gpt-3.5-turbo")
-    print(f"AutoSaveWithAI: Using LLM model: {llm_model}")
+    print("AutoSaveWithAI: Using LLM model: {}".format(llm_model))
 
     prompt_template = settings.get("prompt_template",
         "Based on the following text, suggest a short, descriptive filename. "
@@ -161,11 +161,11 @@ def save_file_with_ai_name(view: sublime.View) -> bool:
         api_key = settings.get("anthropic_api_key", None)
         print("AutoSaveWithAI: Using Anthropic provider")
     else:
-        print(f"AutoSaveWithAI: Using provider from model string: {llm_model}")
+        print("AutoSaveWithAI: Using provider from model string: {}".format(llm_model))
 
     api_base = settings.get("api_base", None)
     if api_base:
-        print(f"AutoSaveWithAI: Using custom API base: {api_base}")
+        print("AutoSaveWithAI: Using custom API base: {}".format(api_base))
 
     # Try to generate filename with LLM
     print("AutoSaveWithAI: Calling LLM to generate filename...")
@@ -173,31 +173,31 @@ def save_file_with_ai_name(view: sublime.View) -> bool:
     ai_filename = client.generate_filename(excerpt, prompt_template)
 
     if ai_filename:
-        print(f"AutoSaveWithAI: LLM generated filename: {ai_filename}")
+        print("AutoSaveWithAI: LLM generated filename: {}".format(ai_filename))
         filename = sanitize_filename(ai_filename)
-        print(f"AutoSaveWithAI: Sanitized filename: {filename}")
+        print("AutoSaveWithAI: Sanitized filename: {}".format(filename))
         # Add prefix
-        filename = f"auto-notes-{filename}"
-        print(f"AutoSaveWithAI: Final filename: {filename}")
+        filename = "auto-notes-{}".format(filename)
+        print("AutoSaveWithAI: Final filename: {}".format(filename))
     else:
         print("AutoSaveWithAI: LLM failed, using timestamp fallback")
         # Fallback to timestamp
         filename = get_timestamp_filename()
-        print(f"AutoSaveWithAI: Fallback filename: {filename}")
+        print("AutoSaveWithAI: Fallback filename: {}".format(filename))
 
     # Construct full path
     full_path = os.path.join(save_dir, filename)
-    print(f"AutoSaveWithAI: Target path: {full_path}")
+    print("AutoSaveWithAI: Target path: {}".format(full_path))
 
     # Handle duplicates by adding number suffix
     if os.path.exists(full_path):
         print("AutoSaveWithAI: File already exists, adding number suffix")
         base, ext = os.path.splitext(full_path)
         counter = 1
-        while os.path.exists(f"{base}-{counter}{ext}"):
+        while os.path.exists("{}-{}{}".format(base, counter, ext)):
             counter += 1
-        full_path = f"{base}-{counter}{ext}"
-        print(f"AutoSaveWithAI: Using numbered path: {full_path}")
+        full_path = "{}-{}{}".format(base, counter, ext)
+        print("AutoSaveWithAI: Using numbered path: {}".format(full_path))
 
     # Save the file
     try:
@@ -208,13 +208,13 @@ def save_file_with_ai_name(view: sublime.View) -> bool:
         view.retarget(full_path)
         view.set_scratch(False)
 
-        print(f"AutoSaveWithAI: Saved to {full_path}")
-        sublime.status_message(f"Auto-saved to {filename}")
+        print("AutoSaveWithAI: Saved to {}".format(full_path))
+        sublime.status_message("Auto-saved to {}".format(filename))
         return True
 
     except Exception as e:
-        print(f"AutoSaveWithAI: Error saving file: {e}")
-        sublime.error_message(f"AutoSaveWithAI: Failed to save file: {e}")
+        print("AutoSaveWithAI: Error saving file: {}".format(e))
+        sublime.error_message("AutoSaveWithAI: Failed to save file: {}".format(e))
         return False
 
 
@@ -285,7 +285,7 @@ class AutoSaveEventListener(sublime_plugin.EventListener):
 
         # Set new timer
         timer_ms = timer_seconds * 1000
-        print(f"AutoSaveWithAI: Timer started for {timer_seconds} seconds")
+        print("AutoSaveWithAI: Timer started for {} seconds".format(timer_seconds))
 
         def auto_save_callback():
             # Check if view still exists and is unsaved
