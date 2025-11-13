@@ -102,7 +102,7 @@ def get_settings():
 def get_timestamp_filename() -> str:
     """Generate fallback filename with timestamp"""
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    return f"auto-notes-{timestamp}.txt"
+    return "auto-notes-{}.txt".format(timestamp)
 
 
 def save_file_with_ai_name(view: sublime.View) -> bool:
