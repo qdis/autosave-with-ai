@@ -1,0 +1,28 @@
+# ABOUTME: Gitignore file for Sublime Text plugin project
+# ABOUTME: Excludes IDE settings, Python cache, and test artifacts
+
+# IDE
+.idea/
+.vscode/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+*.cover
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,27 @@
+{
+    // ABOUTME: Default settings for AutoSaveWithAI Sublime Text plugin
+    // ABOUTME: Configure save directory, Ollama connection, and auto-save behavior
+
+    // Directory where auto-saved files will be stored
+    // Use absolute path or ~/ for home directory
+    "save_directory": "~/Documents/auto-notes",
+
+    // Ollama API endpoint
+    "ollama_url": "http://localhost:11434",
+
+    // Ollama model to use for filename generation
+    "ollama_model": "llama2",
+
+    // Whether to intercept default save (Ctrl+S/Cmd+S) for unsaved files
+    // When true, pressing save on an untitled file will trigger AI naming
+    "overwrite_default_save": false,
+
+    // Auto-save timer in seconds
+    // Set to 0 to disable timer-based auto-save
+    // If > 0, unsaved files will be auto-saved after this many seconds of inactivity
+    "auto_save_timer": 0,
+
+    // Prompt template for filename generation
+    // {content} will be replaced with the first 250 words of the file
+    "prompt_template": "Based on the following text, suggest a short, descriptive filename. Include an appropriate file extension (.txt, .md, .json, .py, etc.) based on the content type. Respond with ONLY the filename, nothing else.\n\nText: {content}"
+}
