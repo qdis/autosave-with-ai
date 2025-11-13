@@ -98,7 +98,7 @@ Open Sublime Text settings: `Preferences > Package Settings > AutoSaveWithAI > S
 ```json
 {
     "save_directory": "~/Documents/auto-notes",
-    "llm_model": "ollama_chat/llama2",
+    "llm_model": "ollama_chat/llama3.2",
     "openai_api_key": "",
     "anthropic_api_key": "",
     "api_base": "http://localhost:11434",
@@ -113,7 +113,7 @@ Open Sublime Text settings: `Preferences > Package Settings > AutoSaveWithAI > S
 - **`llm_model`**: Model identifier
   - OpenAI: `gpt-4o`, `gpt-4-turbo`, `gpt-3.5-turbo`
   - Anthropic: `anthropic/claude-3-5-sonnet-20240620`, `anthropic/claude-3-opus-20240229`
-  - Ollama: `ollama/llama2`, `ollama_chat/mistral` (use `ollama_chat/` for better responses)
+  - Ollama: `ollama/llama3.2`, `ollama_chat/llama3.2` (use `ollama_chat/` for better responses)
 - **`openai_api_key`**: OpenAI API key (leave empty if not using)
 - **`anthropic_api_key`**: Anthropic API key (leave empty if not using)
 - **`api_base`**: Custom API endpoint (optional, for proxies or self-hosted)
@@ -210,7 +210,7 @@ Example: `auto-notes-20250113-143022.txt`
 1. Install Ollama from [ollama.ai](https://ollama.ai/)
 2. Download a model:
    ```bash
-   ollama pull llama2
+   ollama pull llama3.2
    ```
 3. Verify Ollama is running:
    ```bash
@@ -219,7 +219,7 @@ Example: `auto-notes-20250113-143022.txt`
 4. Configure plugin:
    ```json
    {
-       "llm_model": "ollama_chat/llama2",
+       "llm_model": "ollama_chat/llama3.2",
        "api_base": "http://localhost:11434"
    }
    ```
@@ -283,7 +283,7 @@ pip install litellm
 
 3. Test manual generation:
    ```bash
-   ollama run llama2 "Suggest a filename for: meeting notes"
+   ollama run llama3.2 "Suggest a filename for: meeting notes"
    ```
 
 ### Files Not Saving

@@ -36,7 +36,7 @@ class TestLiteLLMIntegration(unittest.TestCase):
     def setUp(self):
         """Set up test client"""
         # Use Ollama via LiteLLM for integration tests
-        self.model = "ollama_chat/llama2"  # Use chat version for better responses
+        self.model = "ollama_chat/llama3.2"  # Use chat version for better responses
         self.client = LiteLLMClient(self.model, api_base="http://localhost:11434")
 
     def test_generate_filename_for_meeting_notes(self):
@@ -160,7 +160,7 @@ class TestLiteLLMNotRunning(unittest.TestCase):
     @unittest.skipIf(is_ollama_running(), "Skip when Ollama is running")
     def test_graceful_failure_when_service_unavailable(self):
         """Test that client returns None when service is not accessible"""
-        client = LiteLLMClient("ollama/llama2", api_base="http://localhost:11434")
+        client = LiteLLMClient("ollama/llama3.2", api_base="http://localhost:11434")
 
         result = client.generate_filename(
             "Test content",

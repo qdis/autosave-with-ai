@@ -34,7 +34,7 @@ class LiteLLMClient:
             return None
 
         try:
-            prompt = prompt_template.format(content=content)
+            prompt = prompt_template.replace('{content}', content)
 
             # Prepare completion arguments
             kwargs = {

@@ -10,7 +10,7 @@
     // Examples:
     //   OpenAI: "gpt-4o", "gpt-4-turbo", "gpt-3.5-turbo"
     //   Anthropic: "anthropic/claude-3-5-sonnet-20240620", "anthropic/claude-3-opus-20240229"
-    //   Ollama (local): "ollama/llama2", "ollama_chat/mistral"
+    //   Ollama (local): "ollama/llama3.2", "ollama_chat/llama3.2"
     "llm_model": "gpt-3.5-turbo",
 
     // API keys for different providers
