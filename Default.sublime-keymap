@@ -1,0 +1,9 @@
+[
+    {
+        "keys": ["ctrl+i"],
+        "command": "auto_save_with_ai",
+        "context": [
+            {"key": "selector", "operator": "equal", "operand": "text"}
+        ]
+    }
+]

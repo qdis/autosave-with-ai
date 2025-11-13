@@ -8,7 +8,7 @@ A Sublime Text plugin that automatically saves unsaved files with AI-generated f
 - **Smart Filename Generation**: Analyzes file content and suggests appropriate filenames with correct extensions
 - **Extension Detection**: Automatically detects content type (JSON, Markdown, Python, etc.) and adds appropriate extensions
 - **Multiple Trigger Options**:
-  - Manual command via Command Palette
+  - Keyboard shortcut (Ctrl+I / Cmd+I) or Command Palette
   - Auto-save on timer (configurable seconds of inactivity)
   - Intercept default save action (Ctrl+S/Cmd+S) for unsaved files
 - **Fallback Mechanism**: Uses timestamp-based naming when LLM is unavailable
@@ -123,7 +123,14 @@ Open Sublime Text settings: `Preferences > Package Settings > AutoSaveWithAI > S
 
 ## Usage
 
-### Method 1: Command Palette
+### Method 1: Manual Trigger
+
+#### Option A: Keyboard Shortcut (Recommended)
+
+1. Create or open an unsaved file
+2. Press **Ctrl+I** (Windows/Linux) or **Cmd+I** (Mac)
+
+#### Option B: Command Palette
 
 1. Create or open an unsaved file
 2. Open Command Palette (Ctrl+Shift+P / Cmd+Shift+P)
