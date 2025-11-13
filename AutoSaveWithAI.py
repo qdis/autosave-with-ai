@@ -6,7 +6,6 @@ import sublime_plugin
 import re
 import os
 from datetime import datetime
-from typing import Optional
 
 try:
     from litellm import completion
@@ -19,12 +18,12 @@ except ImportError:
 class LiteLLMClient:
     """Handles communication with LLM providers via LiteLLM"""
 
-    def __init__(self, model: str, api_key: Optional[str] = None, api_base: Optional[str] = None):
+    def __init__(self, model, api_key=None, api_base=None):
         self.model = model
         self.api_key = api_key
         self.api_base = api_base
 
-    def generate_filename(self, content: str, prompt_template: str) -> Optional[str]:
+    def generate_filename(self, content, prompt_template):
         """
         Call LLM API to generate a filename based on content
         Returns None if API call fails
