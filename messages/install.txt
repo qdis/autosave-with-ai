@@ -1,0 +1,46 @@
+AutoSaveWithAI - Installation Instructions
+==========================================
+
+Thank you for installing AutoSaveWithAI!
+
+IMPORTANT: External Dependency Required
+----------------------------------------
+
+This package requires the `litellm` Python library to function.
+
+Before using this plugin, you MUST install litellm using pip:
+
+    pip install litellm
+
+Or if you're using Python 3 specifically:
+
+    pip3 install litellm
+
+
+Configuration
+-------------
+
+After installing litellm, configure the plugin via:
+Preferences → Package Settings → AutoSaveWithAI → Settings
+
+You'll need to set:
+- llm_model: The model to use (e.g., "gpt-4o-mini", "claude-3-5-sonnet-20241022")
+- API keys for your chosen provider (openai_api_key, anthropic_api_key, etc.)
+
+For Ollama (local models), no API key is needed.
+
+
+Documentation
+-------------
+
+For full documentation, examples, and troubleshooting:
+https://github.com/qdis/sublime-autosave-with-ai
+
+
+Getting Started
+---------------
+
+Once configured, use the command palette (Cmd+Shift+P / Ctrl+Shift+P):
+- "AutoSave: Generate Filename and Save"
+
+Or configure automatic saving via the settings file.
