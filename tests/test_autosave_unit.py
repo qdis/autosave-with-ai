@@ -13,13 +13,16 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # Mock sublime and sublime_plugin modules before importing
 sys.modules['sublime'] = MagicMock()
 sys.modules['sublime_plugin'] = MagicMock()
+# Mock litellm and openai modules
+sys.modules['litellm'] = MagicMock()
+sys.modules['openai'] = MagicMock()
 
 # Import the functions we want to test
 from AutoSaveWithAI import (
     extract_first_words,
     sanitize_filename,
     get_timestamp_filename,
-    OllamaClient
+    LiteLLMClient
 )
 
 
@@ -108,36 +111,32 @@ class TestGetTimestampFilename(unittest.TestCase):
 
     def test_format(self):
         """Test that timestamp filename has correct format"""
-        result = get_timestamp_filename("llama2")
-        self.assertTrue(result.startswith("auto-notes-llama2-"))
+        result = get_timestamp_filename()
+        self.assertTrue(result.startswith("auto-notes-"))
         self.assertTrue(result.endswith(".txt"))
-
-    def test_different_models(self):
-        """Test with different model names"""
-        models = ["llama2", "mistral", "codellama"]
-        for model in models:
-            result = get_timestamp_filename(model)
-            self.assertIn(model, result)
+        # Should contain timestamp pattern YYYYMMDD-HHMMSS
+        self.assertRegex(result, r'auto-notes-\d{8}-\d{6}\.txt')
 
 
-class TestOllamaClient(unittest.TestCase):
-    """Test the OllamaClient class"""
+class TestLiteLLMClient(unittest.TestCase):
+    """Test the LiteLLMClient class"""
 
     def setUp(self):
         """Set up test client"""
-        self.client = OllamaClient("http://localhost:11434", "llama2")
+        self.client = LiteLLMClient("gpt-3.5-turbo")
 
-    @patch('urllib.request.urlopen')
-    def test_successful_generation(self, mock_urlopen):
+    @patch('AutoSaveWithAI.LITELLM_AVAILABLE', True)
+    @patch('AutoSaveWithAI.completion')
+    def test_successful_generation(self, mock_completion):
         """Test successful filename generation"""
         # Mock successful API response
-        mock_response = Mock()
-        mock_response.read.return_value = json.dumps({
-            "response": "meeting-notes.md"
-        }).encode('utf-8')
-        mock_response.__enter__ = Mock(return_value=mock_response)
-        mock_response.__exit__ = Mock(return_value=False)
-        mock_urlopen.return_value = mock_response
+        mock_completion.return_value = {
+            'choices': [{
+                'message': {
+                    'content': 'meeting-notes.md'
+                }
+            }]
+        }
 
         result = self.client.generate_filename(
             "This is a test",
@@ -145,11 +144,32 @@ class TestOllamaClient(unittest.TestCase):
         )
 
         self.assertEqual(result, "meeting-notes.md")
+        # Verify completion was called with correct arguments
+        self.assertTrue(mock_completion.called)
+        call_args = mock_completion.call_args[1]
+        self.assertEqual(call_args['model'], 'gpt-3.5-turbo')
+        self.assertEqual(len(call_args['messages']), 1)
+        self.assertIn("Generate filename: This is a test", call_args['messages'][0]['content'])
 
-    @patch('urllib.request.urlopen')
-    def test_api_timeout(self, mock_urlopen):
+    @patch('AutoSaveWithAI.LITELLM_AVAILABLE', True)
+    @patch('AutoSaveWithAI.completion')
+    def test_authentication_error(self, mock_completion):
+        """Test handling of authentication error"""
+        # Create a mock AuthenticationError
+        mock_completion.side_effect = Exception("Invalid API key")
+
+        result = self.client.generate_filename(
+            "This is a test",
+            "Generate filename: {content}"
+        )
+
+        self.assertIsNone(result)
+
+    @patch('AutoSaveWithAI.LITELLM_AVAILABLE', True)
+    @patch('AutoSaveWithAI.completion')
+    def test_api_timeout(self, mock_completion):
         """Test handling of API timeout"""
-        mock_urlopen.side_effect = TimeoutError("Connection timeout")
+        mock_completion.side_effect = Exception("Timeout")
 
         result = self.client.generate_filename(
             "This is a test",
@@ -158,11 +178,11 @@ class TestOllamaClient(unittest.TestCase):
 
         self.assertIsNone(result)
 
-    @patch('urllib.request.urlopen')
-    def test_api_connection_error(self, mock_urlopen):
+    @patch('AutoSaveWithAI.LITELLM_AVAILABLE', True)
+    @patch('AutoSaveWithAI.completion')
+    def test_api_connection_error(self, mock_completion):
         """Test handling of connection error"""
-        import urllib.error
-        mock_urlopen.side_effect = urllib.error.URLError("Connection refused")
+        mock_completion.side_effect = Exception("Connection refused")
 
         result = self.client.generate_filename(
             "This is a test",
@@ -171,18 +191,9 @@ class TestOllamaClient(unittest.TestCase):
 
         self.assertIsNone(result)
 
-    @patch('urllib.request.urlopen')
-    def test_api_http_error(self, mock_urlopen):
-        """Test handling of HTTP error"""
-        import urllib.error
-        mock_urlopen.side_effect = urllib.error.HTTPError(
-            "http://localhost:11434/api/generate",
-            500,
-            "Internal Server Error",
-            {},
-            None
-        )
-
+    @patch('AutoSaveWithAI.LITELLM_AVAILABLE', False)
+    def test_litellm_not_available(self):
+        """Test handling when litellm is not installed"""
         result = self.client.generate_filename(
             "This is a test",
             "Generate filename: {content}"
@@ -190,47 +201,43 @@ class TestOllamaClient(unittest.TestCase):
 
         self.assertIsNone(result)
 
-    @patch('urllib.request.urlopen')
-    def test_malformed_json_response(self, mock_urlopen):
-        """Test handling of malformed JSON response"""
-        mock_response = Mock()
-        mock_response.read.return_value = b"not valid json"
-        mock_response.__enter__ = Mock(return_value=mock_response)
-        mock_response.__exit__ = Mock(return_value=False)
-        mock_urlopen.return_value = mock_response
+    @patch('AutoSaveWithAI.LITELLM_AVAILABLE', True)
+    @patch('AutoSaveWithAI.completion')
+    def test_with_api_key(self, mock_completion):
+        """Test that API key is passed correctly"""
+        mock_completion.return_value = {
+            'choices': [{
+                'message': {
+                    'content': 'test.txt'
+                }
+            }]
+        }
 
-        result = self.client.generate_filename(
-            "This is a test",
-            "Generate filename: {content}"
-        )
+        client = LiteLLMClient("gpt-4", api_key="test-key-123")
+        result = client.generate_filename("Test", "Generate: {content}")
 
-        self.assertIsNone(result)
+        self.assertEqual(result, "test.txt")
+        call_args = mock_completion.call_args[1]
+        self.assertEqual(call_args['api_key'], "test-key-123")
 
-    @patch('urllib.request.urlopen')
-    def test_prompt_template_formatting(self, mock_urlopen):
-        """Test that prompt template is correctly formatted"""
-        mock_response = Mock()
-        mock_response.read.return_value = json.dumps({
-            "response": "test.txt"
-        }).encode('utf-8')
-        mock_response.__enter__ = Mock(return_value=mock_response)
-        mock_response.__exit__ = Mock(return_value=False)
-        mock_urlopen.return_value = mock_response
+    @patch('AutoSaveWithAI.LITELLM_AVAILABLE', True)
+    @patch('AutoSaveWithAI.completion')
+    def test_with_api_base(self, mock_completion):
+        """Test that API base is passed correctly"""
+        mock_completion.return_value = {
+            'choices': [{
+                'message': {
+                    'content': 'test.txt'
+                }
+            }]
+        }
 
-        content = "Sample content"
-        template = "Content: {content}"
+        client = LiteLLMClient("gpt-4", api_base="http://localhost:8000")
+        result = client.generate_filename("Test", "Generate: {content}")
 
-        self.client.generate_filename(content, template)
-
-        # Verify the request was made
-        self.assertTrue(mock_urlopen.called)
-
-        # Get the request object that was passed
-        request = mock_urlopen.call_args[0][0]
-        request_data = json.loads(request.data.decode('utf-8'))
-
-        self.assertIn("prompt", request_data)
-        self.assertEqual(request_data["prompt"], f"Content: {content}")
+        self.assertEqual(result, "test.txt")
+        call_args = mock_completion.call_args[1]
+        self.assertEqual(call_args['api_base'], "http://localhost:8000")
 
 
 if __name__ == '__main__':

@@ -1,16 +1,26 @@
 {
     // ABOUTME: Default settings for AutoSaveWithAI Sublime Text plugin
-    // ABOUTME: Configure save directory, Ollama connection, and auto-save behavior
+    // ABOUTME: Configure save directory, LLM provider, API keys, and auto-save behavior
 
     // Directory where auto-saved files will be stored
     // Use absolute path or ~/ for home directory
     "save_directory": "~/Documents/auto-notes",
 
-    // Ollama API endpoint
-    "ollama_url": "http://localhost:11434",
+    // LLM model to use for filename generation
+    // Examples:
+    //   OpenAI: "gpt-4o", "gpt-4-turbo", "gpt-3.5-turbo"
+    //   Anthropic: "anthropic/claude-3-5-sonnet-20240620", "anthropic/claude-3-opus-20240229"
+    //   Ollama (local): "ollama/llama2", "ollama_chat/mistral"
+    "llm_model": "gpt-3.5-turbo",
 
-    // Ollama model to use for filename generation
-    "ollama_model": "llama2",
+    // API keys for different providers
+    // Leave empty/null if not using that provider
+    "openai_api_key": "",
+    "anthropic_api_key": "",
+
+    // Optional: Custom API base URL (for proxies or self-hosted endpoints)
+    // Leave null for default provider endpoints
+    "api_base": null,
 
     // Whether to intercept default save (Ctrl+S/Cmd+S) for unsaved files
     // When true, pressing save on an untitled file will trigger AI naming

@@ -1,0 +1,4 @@
+# ABOUTME: Python dependencies for AutoSaveWithAI Sublime Text plugin
+# ABOUTME: Install with: pip install -r requirements.txt
+
+litellm>=1.0.0

@@ -1,53 +1,61 @@
 # ABOUTME: Sublime Text plugin that auto-saves unsaved files with AI-generated filenames
-# ABOUTME: Uses Ollama to analyze content and suggest appropriate filenames with extensions
+# ABOUTME: Uses LiteLLM to support multiple AI providers for filename generation
 
 import sublime
 import sublime_plugin
-import urllib.request
-import urllib.error
-import json
 import re
 import os
 from datetime import datetime
-from typing import Optional, Tuple
+from typing import Optional
+
+try:
+    from litellm import completion
+    LITELLM_AVAILABLE = True
+except ImportError:
+    LITELLM_AVAILABLE = False
+    print("AutoSaveWithAI: litellm not installed. Install with: pip install litellm")
 
 
-class OllamaClient:
-    """Handles communication with local Ollama API"""
+class LiteLLMClient:
+    """Handles communication with LLM providers via LiteLLM"""
 
-    def __init__(self, url: str, model: str):
-        self.url = url
+    def __init__(self, model: str, api_key: Optional[str] = None, api_base: Optional[str] = None):
         self.model = model
+        self.api_key = api_key
+        self.api_base = api_base
 
     def generate_filename(self, content: str, prompt_template: str) -> Optional[str]:
         """
-        Call Ollama API to generate a filename based on content
+        Call LLM API to generate a filename based on content
         Returns None if API call fails
         """
+        if not LITELLM_AVAILABLE:
+            print("AutoSaveWithAI: litellm not available")
+            return None
+
         try:
             prompt = prompt_template.format(content=content)
 
-            data = {
+            # Prepare completion arguments
+            kwargs = {
                 "model": self.model,
-                "prompt": prompt,
-                "stream": False
+                "messages": [{"role": "user", "content": prompt}],
+                "timeout": 30
             }
 
-            request = urllib.request.Request(
-                f"{self.url}/api/generate",
-                data=json.dumps(data).encode('utf-8'),
-                headers={'Content-Type': 'application/json'}
-            )
+            if self.api_key:
+                kwargs["api_key"] = self.api_key
 
-            with urllib.request.urlopen(request, timeout=10) as response:
-                result = json.loads(response.read().decode('utf-8'))
-                return result.get('response', '').strip()
+            if self.api_base:
+                kwargs["api_base"] = self.api_base
 
-        except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError) as e:
-            print(f"AutoSaveWithAI: Ollama API error: {e}")
-            return None
+            response = completion(**kwargs)
+            result = response['choices'][0]['message']['content'].strip()
+            return result
+
         except Exception as e:
-            print(f"AutoSaveWithAI: Unexpected error: {e}")
+            # Catch all exceptions from LiteLLM/API providers
+            print(f"AutoSaveWithAI: LLM API error: {e}")
             return None
 
 
@@ -87,10 +95,10 @@ def get_settings():
     return sublime.load_settings("AutoSaveWithAI.sublime-settings")
 
 
-def get_timestamp_filename(model: str) -> str:
+def get_timestamp_filename() -> str:
     """Generate fallback filename with timestamp"""
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    return f"auto-notes-{model}-{timestamp}.txt"
+    return f"auto-notes-{timestamp}.txt"
 
 
 def save_file_with_ai_name(view: sublime.View) -> bool:
@@ -125,25 +133,33 @@ def save_file_with_ai_name(view: sublime.View) -> bool:
     # Extract first 250 words
     excerpt = extract_first_words(content, 250)
 
-    # Get Ollama settings
-    ollama_url = settings.get("ollama_url", "http://localhost:11434")
-    ollama_model = settings.get("ollama_model", "llama2")
+    # Get LLM settings
+    llm_model = settings.get("llm_model", "gpt-3.5-turbo")
     prompt_template = settings.get("prompt_template",
         "Based on the following text, suggest a short, descriptive filename. "
         "Include an appropriate file extension (.txt, .md, .json, .py, etc.) based on the content type. "
         "Respond with ONLY the filename, nothing else.\n\nText: {content}")
 
-    # Try to generate filename with Ollama
-    client = OllamaClient(ollama_url, ollama_model)
+    # Get API keys
+    api_key = None
+    if llm_model.startswith("gpt-") or llm_model.startswith("openai/"):
+        api_key = settings.get("openai_api_key", None)
+    elif llm_model.startswith("anthropic/"):
+        api_key = settings.get("anthropic_api_key", None)
+
+    api_base = settings.get("api_base", None)
+
+    # Try to generate filename with LLM
+    client = LiteLLMClient(llm_model, api_key, api_base)
     ai_filename = client.generate_filename(excerpt, prompt_template)
 
     if ai_filename:
         filename = sanitize_filename(ai_filename)
         # Add prefix
-        filename = f"auto-notes-{ollama_model}-{filename}"
+        filename = f"auto-notes-{filename}"
     else:
         # Fallback to timestamp
-        filename = get_timestamp_filename(ollama_model)
+        filename = get_timestamp_filename()
 
     # Construct full path
     full_path = os.path.join(save_dir, filename)

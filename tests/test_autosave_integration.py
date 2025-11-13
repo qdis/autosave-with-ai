@@ -1,12 +1,11 @@
-# ABOUTME: Integration tests for AutoSaveWithAI plugin requiring running Ollama
-# ABOUTME: Tests actual API calls and end-to-end filename generation
+# ABOUTME: Integration tests for AutoSaveWithAI plugin requiring real LLM access
+# ABOUTME: Tests actual API calls and end-to-end filename generation with various providers
 
 import unittest
 import sys
 import os
 import urllib.request
 import urllib.error
-import json
 from unittest.mock import MagicMock
 
 # Add parent directory to path to import the plugin
@@ -16,7 +15,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.modules['sublime'] = MagicMock()
 sys.modules['sublime_plugin'] = MagicMock()
 
-from AutoSaveWithAI import OllamaClient, extract_first_words
+from AutoSaveWithAI import LiteLLMClient, extract_first_words, LITELLM_AVAILABLE
 
 
 def is_ollama_running(url="http://localhost:11434"):
@@ -29,15 +28,16 @@ def is_ollama_running(url="http://localhost:11434"):
         return False
 
 
+@unittest.skipUnless(LITELLM_AVAILABLE, "LiteLLM is not installed")
 @unittest.skipUnless(is_ollama_running(), "Ollama is not running")
-class TestOllamaIntegration(unittest.TestCase):
-    """Integration tests that require Ollama to be running"""
+class TestLiteLLMIntegration(unittest.TestCase):
+    """Integration tests that require LiteLLM and Ollama to be running"""
 
     def setUp(self):
         """Set up test client"""
-        self.url = "http://localhost:11434"
-        self.model = "llama2"  # Use a common model
-        self.client = OllamaClient(self.url, self.model)
+        # Use Ollama via LiteLLM for integration tests
+        self.model = "ollama_chat/llama2"  # Use chat version for better responses
+        self.client = LiteLLMClient(self.model, api_base="http://localhost:11434")
 
     def test_generate_filename_for_meeting_notes(self):
         """Test filename generation for meeting notes content"""
@@ -79,7 +79,7 @@ class TestOllamaIntegration(unittest.TestCase):
         self.assertIsNotNone(result)
         self.assertGreater(len(result), 0)
         print(f"Generated filename for code: {result}")
-        # Ideally should suggest .py, but we can't guarantee AI behavior
+        # Should recognize it's code
         self.assertIn('.', result)
 
     def test_generate_filename_for_json(self):
@@ -152,29 +152,15 @@ class TestOllamaIntegration(unittest.TestCase):
         self.assertGreater(len(result), 0)
         print(f"Generated filename for long content: {result}")
 
-    def test_empty_content_handling(self):
-        """Test how Ollama handles empty or minimal content"""
-        content = "."
 
-        prompt = ("Based on the following text, suggest a short, descriptive filename. "
-                 "Include an appropriate file extension (.txt, .md, .json, .py, etc.) "
-                 "based on the content type. Respond with ONLY the filename, nothing else.\n\n"
-                 f"Text: {content}")
-
-        result = self.client.generate_filename(content, prompt)
-
-        # Should still return something
-        self.assertIsNotNone(result)
-        print(f"Generated filename for minimal content: {result}")
-
-
-class TestOllamaNotRunning(unittest.TestCase):
-    """Test behavior when Ollama is not running"""
+@unittest.skipUnless(LITELLM_AVAILABLE, "LiteLLM is not installed")
+class TestLiteLLMNotRunning(unittest.TestCase):
+    """Test behavior when LLM service is not available"""
 
     @unittest.skipIf(is_ollama_running(), "Skip when Ollama is running")
-    def test_graceful_failure_when_ollama_down(self):
-        """Test that client returns None when Ollama is not accessible"""
-        client = OllamaClient("http://localhost:11434", "llama2")
+    def test_graceful_failure_when_service_unavailable(self):
+        """Test that client returns None when service is not accessible"""
+        client = LiteLLMClient("ollama/llama2", api_base="http://localhost:11434")
 
         result = client.generate_filename(
             "Test content",

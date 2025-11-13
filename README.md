@@ -1,27 +1,45 @@
 # AutoSaveWithAI - Sublime Text Plugin
 
-A Sublime Text plugin that automatically saves unsaved files with AI-generated filenames using Ollama.
+A Sublime Text plugin that automatically saves unsaved files with AI-generated filenames using LiteLLM to support multiple AI providers.
 
 ## Features
 
-- **AI-Powered Filename Generation**: Uses local Ollama to analyze file content and suggest appropriate filenames
-- **Smart Extension Detection**: Automatically detects content type (JSON, Markdown, Python, etc.) and adds appropriate extensions
+- **Multi-Provider AI Support**: Works with OpenAI, Anthropic Claude, local Ollama, and 80+ other providers via LiteLLM
+- **Smart Filename Generation**: Analyzes file content and suggests appropriate filenames with correct extensions
+- **Extension Detection**: Automatically detects content type (JSON, Markdown, Python, etc.) and adds appropriate extensions
 - **Multiple Trigger Options**:
   - Manual command via Command Palette
   - Auto-save on timer (configurable seconds of inactivity)
   - Intercept default save action (Ctrl+S/Cmd+S) for unsaved files
-- **Fallback Mechanism**: Uses timestamp-based naming when Ollama is unavailable
-- **Configurable**: Customize save directory, Ollama model, prompts, and behavior
+- **Fallback Mechanism**: Uses timestamp-based naming when LLM is unavailable
+- **Flexible Configuration**: Customize save directory, model, API keys, and behavior
 
 ## Requirements
 
 - Sublime Text 4 (Python 3.8+)
-- [Ollama](https://ollama.ai/) installed and running locally
-- An Ollama model downloaded (e.g., `llama2`, `mistral`, `codellama`)
+- Python package: `litellm` (see Installation)
+- API access to at least one LLM provider:
+  - **OpenAI**: API key from [platform.openai.com](https://platform.openai.com)
+  - **Anthropic**: API key from [console.anthropic.com](https://console.anthropic.com)
+  - **Ollama**: Local installation from [ollama.ai](https://ollama.ai/) (free)
 
 ## Installation
 
-### Option 1: Manual Installation
+### Step 1: Install LiteLLM
+
+LiteLLM must be installed in the Python environment used by Sublime Text:
+
+```bash
+# Install litellm
+pip install litellm
+
+# Or if Sublime Text uses a specific Python:
+/path/to/sublime/python -m pip install litellm
+```
+
+### Step 2: Install Plugin
+
+#### Option A: Manual Installation
 
 1. Clone or download this repository
 2. Copy the plugin files to your Sublime Text Packages directory:
@@ -31,7 +49,7 @@ A Sublime Text plugin that automatically saves unsaved files with AI-generated f
 
 3. Restart Sublime Text
 
-### Option 2: Symlink (for development)
+#### Option B: Symlink (for development)
 
 ```bash
 # macOS/Linux
@@ -41,40 +59,64 @@ ln -s /path/to/sublime-autosave-with-ai ~/Library/Application\ Support/Sublime\ 
 mklink /D "%APPDATA%\Sublime Text\Packages\AutoSaveWithAI" "C:\path\to\sublime-autosave-with-ai"
 ```
 
-## Ollama Setup
-
-1. Install Ollama from [ollama.ai](https://ollama.ai/)
-2. Download a model:
-   ```bash
-   ollama pull llama2
-   ```
-3. Verify Ollama is running:
-   ```bash
-   ollama list
-   ```
-
 ## Configuration
 
 Open Sublime Text settings: `Preferences > Package Settings > AutoSaveWithAI > Settings`
 
-### Default Settings
+### Example Configurations
+
+#### OpenAI (GPT-4)
 
 ```json
 {
     "save_directory": "~/Documents/auto-notes",
-    "ollama_url": "http://localhost:11434",
-    "ollama_model": "llama2",
+    "llm_model": "gpt-4o",
+    "openai_api_key": "sk-...",
+    "anthropic_api_key": "",
+    "api_base": null,
     "overwrite_default_save": false,
-    "auto_save_timer": 0,
-    "prompt_template": "Based on the following text, suggest a short, descriptive filename. Include an appropriate file extension (.txt, .md, .json, .py, etc.) based on the content type. Respond with ONLY the filename, nothing else.\n\nText: {content}"
+    "auto_save_timer": 0
+}
+```
+
+#### Anthropic Claude
+
+```json
+{
+    "save_directory": "~/Documents/auto-notes",
+    "llm_model": "anthropic/claude-3-5-sonnet-20240620",
+    "openai_api_key": "",
+    "anthropic_api_key": "sk-ant-...",
+    "api_base": null,
+    "overwrite_default_save": false,
+    "auto_save_timer": 0
+}
+```
+
+#### Local Ollama (Free)
+
+```json
+{
+    "save_directory": "~/Documents/auto-notes",
+    "llm_model": "ollama_chat/llama2",
+    "openai_api_key": "",
+    "anthropic_api_key": "",
+    "api_base": "http://localhost:11434",
+    "overwrite_default_save": false,
+    "auto_save_timer": 30
 }
 ```
 
 ### Configuration Options
 
 - **`save_directory`**: Directory where files will be saved (supports `~/` for home directory)
-- **`ollama_url`**: Ollama API endpoint (default: `http://localhost:11434`)
-- **`ollama_model`**: Model to use for generation (e.g., `llama2`, `mistral`, `codellama`)
+- **`llm_model`**: Model identifier
+  - OpenAI: `gpt-4o`, `gpt-4-turbo`, `gpt-3.5-turbo`
+  - Anthropic: `anthropic/claude-3-5-sonnet-20240620`, `anthropic/claude-3-opus-20240229`
+  - Ollama: `ollama/llama2`, `ollama_chat/mistral` (use `ollama_chat/` for better responses)
+- **`openai_api_key`**: OpenAI API key (leave empty if not using)
+- **`anthropic_api_key`**: Anthropic API key (leave empty if not using)
+- **`api_base`**: Custom API endpoint (optional, for proxies or self-hosted)
 - **`overwrite_default_save`**: If `true`, intercepts Ctrl+S/Cmd+S on unsaved files
 - **`auto_save_timer`**: Seconds of inactivity before auto-save (0 = disabled)
 - **`prompt_template`**: Template for AI prompt (`{content}` is replaced with file content)
@@ -116,59 +158,89 @@ Now pressing Ctrl+S/Cmd+S on an unsaved file will trigger AI naming.
 Generated filenames follow this pattern:
 
 ```
-auto-notes-{model}-{ai-generated-name}.{extension}
+auto-notes-{ai-generated-name}.{extension}
 ```
 
 Examples:
-- `auto-notes-llama2-meeting-notes.md`
-- `auto-notes-llama2-fibonacci-calculator.py`
-- `auto-notes-llama2-user-data.json`
+- `auto-notes-meeting-notes.md`
+- `auto-notes-fibonacci-calculator.py`
+- `auto-notes-user-data.json`
 
-If Ollama is unavailable, fallback format:
+If LLM is unavailable, fallback format:
 ```
-auto-notes-{model}-{timestamp}.txt
+auto-notes-{timestamp}.txt
 ```
 
-Example: `auto-notes-llama2-20250113-143022.txt`
+Example: `auto-notes-20250113-143022.txt`
 
 ## How It Works
 
 1. Plugin extracts first 250 words from unsaved file
-2. Sends content to Ollama with prompt asking for filename suggestion
-3. Ollama analyzes content and suggests filename with appropriate extension
+2. Sends content to configured LLM via LiteLLM
+3. LLM analyzes content and suggests filename with appropriate extension
 4. Plugin sanitizes filename and adds prefix
 5. File is saved to configured directory
 
+## Setup for Different Providers
+
+### OpenAI Setup
+
+1. Get API key from [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
+2. Add to settings:
+   ```json
+   {
+       "llm_model": "gpt-3.5-turbo",
+       "openai_api_key": "sk-..."
+   }
+   ```
+
+### Anthropic Claude Setup
+
+1. Get API key from [console.anthropic.com](https://console.anthropic.com/)
+2. Add to settings:
+   ```json
+   {
+       "llm_model": "anthropic/claude-3-5-sonnet-20240620",
+       "anthropic_api_key": "sk-ant-..."
+   }
+   ```
+
+### Ollama Setup (Local, Free)
+
+1. Install Ollama from [ollama.ai](https://ollama.ai/)
+2. Download a model:
+   ```bash
+   ollama pull llama2
+   ```
+3. Verify Ollama is running:
+   ```bash
+   ollama list
+   ```
+4. Configure plugin:
+   ```json
+   {
+       "llm_model": "ollama_chat/llama2",
+       "api_base": "http://localhost:11434"
+   }
+   ```
+
 ## Testing
 
-### Run Unit Tests (no Ollama required)
+### Run Unit Tests (no LLM required)
 
 ```bash
-cd /path/to/sublime-autosave-with-ai
-python -m pytest tests/test_autosave_unit.py -v
+python tests/test_autosave_unit.py -v
 ```
 
-Or with unittest:
+### Run Integration Tests (requires LLM access)
+
+For Ollama:
 ```bash
-python tests/test_autosave_unit.py
-```
-
-### Run Integration Tests (requires Ollama)
-
-Make sure Ollama is running first:
-
-```bash
+# Make sure Ollama is running
 ollama serve
-```
 
-Then run tests:
-```bash
-python -m pytest tests/test_autosave_integration.py -v
-```
-
-Or with unittest:
-```bash
-python tests/test_autosave_integration.py
+# Run tests
+python tests/test_autosave_integration.py -v
 ```
 
 ### Run All Tests
@@ -183,6 +255,19 @@ python -m pytest tests/ -v
 
 1. Check Sublime Text console: `View > Show Console`
 2. Look for error messages starting with "AutoSaveWithAI:"
+
+### LiteLLM Not Installed
+
+If you see "litellm not installed", install it:
+```bash
+pip install litellm
+```
+
+### OpenAI/Anthropic API Errors
+
+1. Verify API key is correct
+2. Check API key has sufficient credits/quota
+3. Check console for specific error messages
 
 ### Ollama Connection Errors
 
@@ -222,6 +307,7 @@ sublime-autosave-with-ai/
 ├── AutoSaveWithAI.py              # Main plugin code
 ├── AutoSaveWithAI.sublime-settings # Default settings
 ├── Default.sublime-commands        # Command palette entries
+├── requirements.txt                # Python dependencies
 ├── tests/
 │   ├── test_autosave_unit.py      # Unit tests
 │   └── test_autosave_integration.py # Integration tests
@@ -231,7 +317,7 @@ sublime-autosave-with-ai/
 
 ### Key Classes
 
-- **`OllamaClient`**: Handles API communication with Ollama
+- **`LiteLLMClient`**: Handles API communication with LLM providers via LiteLLM
 - **`AutoSaveWithAiCommand`**: Command for manual trigger via Command Palette
 - **`AutoSaveEventListener`**: Handles save events and timer-based auto-save
 
@@ -243,6 +329,15 @@ sublime-autosave-with-ai/
 4. Run tests to ensure they pass
 5. Submit a pull request
 
+## Supported Providers
+
+Via LiteLLM, this plugin supports 80+ providers including:
+
+- **Major AI APIs**: OpenAI, Anthropic, Google Vertex AI, AWS Bedrock, Azure OpenAI
+- **Alternative APIs**: Mistral, Cohere, Groq, DeepSeek, Perplexity, Together AI
+- **Local/Self-hosted**: Ollama, LM Studio, vLLM, HuggingFace
+- **And many more**: See [LiteLLM providers](https://docs.litellm.ai/docs/providers)
+
 ## License
 
 MIT License - feel free to use and modify as needed.
@@ -251,7 +346,8 @@ MIT License - feel free to use and modify as needed.
 
 Built with:
 - [Sublime Text](https://www.sublimetext.com/) - The text editor
-- [Ollama](https://ollama.ai/) - Local LLM runtime
+- [LiteLLM](https://github.com/BerriAI/litellm) - Unified LLM API interface
+- [Ollama](https://ollama.ai/) - Local LLM runtime (optional)
 
 ## Support
 
