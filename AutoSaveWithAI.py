@@ -1,5 +1,5 @@
 # ABOUTME: Sublime Text plugin that auto-saves unsaved files with AI-generated filenames
-# ABOUTME: Uses LiteLLM to support multiple AI providers for filename generation
+# ABOUTME: Uses stdlib HTTP client to support OpenAI-compatible API providers
 
 import sublime
 import sublime_plugin
@@ -8,56 +8,88 @@ import os
 from datetime import datetime
 
 try:
-    from litellm import completion
-    LITELLM_AVAILABLE = True
+    from . import ai_client
+    AI_CLIENT_AVAILABLE = True
 except ImportError:
-    LITELLM_AVAILABLE = False
-    print("AutoSaveWithAI: litellm not installed. Install with: pip install litellm")
+    try:
+        import ai_client
+        AI_CLIENT_AVAILABLE = True
+    except ImportError:
+        AI_CLIENT_AVAILABLE = False
+        print("AutoSaveWithAI: ai_client module not found")
 
 
-class LiteLLMClient:
-    """Handles communication with LLM providers via LiteLLM"""
+class AIClient:
+    """Handles communication with OpenAI-compatible API providers"""
 
-    def __init__(self, model, api_key=None, api_base=None):
+    def __init__(self, model, api_key=None, api_base=None, api_type="chat",
+                 auth_header_name="Authorization", auth_header_prefix="Bearer "):
         self.model = model
         self.api_key = api_key
         self.api_base = api_base
+        self.api_type = api_type
+        self.auth_header_name = auth_header_name
+        self.auth_header_prefix = auth_header_prefix
 
     def generate_filename(self, content, prompt_template):
         """
         Call LLM API to generate a filename based on content
         Returns None if API call fails
         """
-        if not LITELLM_AVAILABLE:
-            print("AutoSaveWithAI: litellm not available")
+        if not AI_CLIENT_AVAILABLE:
+            print("AutoSaveWithAI: ai_client module not available")
+            return None
+
+        if not self.api_key:
+            print("AutoSaveWithAI: No API key provided")
+            return None
+
+        if not self.api_base:
+            print("AutoSaveWithAI: No API base URL provided")
             return None
 
         try:
             prompt = prompt_template.replace('{content}', content)
             print("AutoSaveWithAI: Sending {} characters to LLM".format(len(content)))
+            print("AutoSaveWithAI: Using API type: {}".format(self.api_type))
+            print("AutoSaveWithAI: Using API base: {}".format(self.api_base))
 
-            # Prepare completion arguments
-            kwargs = {
-                "model": self.model,
-                "messages": [{"role": "user", "content": prompt}],
-                "timeout": 30
-            }
+            if self.api_type == "responses":
+                # Use Responses API with chat-like message format
+                input_value = [
+                    {"type": "message", "role": "user", "content": prompt}
+                ]
+                print("AutoSaveWithAI: Making Responses API call...")
+                response = ai_client.responses_create(
+                    base_url=self.api_base,
+                    api_key=self.api_key,
+                    model=self.model,
+                    input_value=input_value,
+                    max_output_tokens=100,
+                    auth_header_name=self.auth_header_name,
+                    auth_header_prefix=self.auth_header_prefix
+                )
+                result = ai_client.extract_response_text(response).strip()
+            else:
+                # Use Chat Completions API (default)
+                messages = [{"role": "user", "content": prompt}]
+                print("AutoSaveWithAI: Making Chat Completions API call...")
+                response = ai_client.chat_completion(
+                    base_url=self.api_base,
+                    api_key=self.api_key,
+                    model=self.model,
+                    messages=messages,
+                    max_tokens=100,
+                    auth_header_name=self.auth_header_name,
+                    auth_header_prefix=self.auth_header_prefix
+                )
+                result = ai_client.extract_chat_content(response).strip()
 
-            if self.api_key:
-                kwargs["api_key"] = self.api_key
-                print("AutoSaveWithAI: Using API key for authentication")
-
-            if self.api_base:
-                kwargs["api_base"] = self.api_base
-
-            print("AutoSaveWithAI: Making API call...")
-            response = completion(**kwargs)
-            result = response['choices'][0]['message']['content'].strip()
             print("AutoSaveWithAI: LLM responded with: {}".format(result))
             return result
 
         except Exception as e:
-            # Catch all exceptions from LiteLLM/API providers
+            # Catch all exceptions from API calls
             print("AutoSaveWithAI: LLM API error: {}".format(e))
             return None
 
@@ -151,7 +183,13 @@ def save_file_with_ai_name(view: sublime.View) -> bool:
         "Include an appropriate file extension (.txt, .md, .json, .py, etc.) based on the content type. "
         "Respond with ONLY the filename, nothing else.\n\nText: {content}")
 
-    # Get API keys
+    # Get API configuration
+    api_base = settings.get("api_base", "https://api.openai.com/v1")
+    api_type = settings.get("api_type", "chat")
+    auth_header_name = settings.get("auth_header_name", "Authorization")
+    auth_header_prefix = settings.get("auth_header_prefix", "Bearer ")
+
+    # Get API keys based on model
     api_key = None
     if llm_model.startswith("gpt-") or llm_model.startswith("openai/"):
         api_key = settings.get("openai_api_key", None)
@@ -160,15 +198,23 @@ def save_file_with_ai_name(view: sublime.View) -> bool:
         api_key = settings.get("anthropic_api_key", None)
         print("AutoSaveWithAI: Using Anthropic provider")
     else:
+        # For other providers, check if there's a generic api_key setting
+        api_key = settings.get("api_key", None)
         print("AutoSaveWithAI: Using provider from model string: {}".format(llm_model))
 
-    api_base = settings.get("api_base", None)
-    if api_base:
-        print("AutoSaveWithAI: Using custom API base: {}".format(api_base))
+    if not api_key:
+        print("AutoSaveWithAI: WARNING - No API key configured")
 
     # Try to generate filename with LLM
     print("AutoSaveWithAI: Calling LLM to generate filename...")
-    client = LiteLLMClient(llm_model, api_key, api_base)
+    client = AIClient(
+        model=llm_model,
+        api_key=api_key,
+        api_base=api_base,
+        api_type=api_type,
+        auth_header_name=auth_header_name,
+        auth_header_prefix=auth_header_prefix
+    )
     ai_filename = client.generate_filename(excerpt, prompt_template)
 
     if ai_filename:

@@ -1,11 +1,9 @@
-# ABOUTME: Integration tests for AutoSaveWithAI plugin requiring real LLM access
-# ABOUTME: Tests actual API calls and end-to-end filename generation with various providers
+# ABOUTME: Integration tests for AutoSaveWithAI plugin requiring real API access
+# ABOUTME: Tests actual API calls and end-to-end filename generation with OpenAI-compatible endpoints
 
 import unittest
 import sys
 import os
-import urllib.request
-import urllib.error
 from unittest.mock import MagicMock
 
 # Add parent directory to path to import the plugin
@@ -15,29 +13,33 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.modules['sublime'] = MagicMock()
 sys.modules['sublime_plugin'] = MagicMock()
 
-from AutoSaveWithAI import LiteLLMClient, extract_first_words, LITELLM_AVAILABLE
+from AutoSaveWithAI import AIClient, extract_first_words, AI_CLIENT_AVAILABLE
 
 
-def is_ollama_running(url="http://localhost:11434"):
-    """Check if Ollama is running and accessible"""
-    try:
-        request = urllib.request.Request(f"{url}/api/tags")
-        with urllib.request.urlopen(request, timeout=2) as response:
-            return response.status == 200
-    except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError):
-        return False
+def get_test_config():
+    """Get test configuration from environment variables or use defaults"""
+    return {
+        'model': os.environ.get('TEST_MODEL', 'gpt-3.5-turbo'),
+        'api_key': os.environ.get('TEST_API_KEY', ''),
+        'api_base': os.environ.get('TEST_API_BASE', 'https://api.openai.com/v1'),
+        'api_type': os.environ.get('TEST_API_TYPE', 'chat'),
+    }
 
 
-@unittest.skipUnless(LITELLM_AVAILABLE, "LiteLLM is not installed")
-@unittest.skipUnless(is_ollama_running(), "Ollama is not running")
-class TestLiteLLMIntegration(unittest.TestCase):
-    """Integration tests that require LiteLLM and Ollama to be running"""
+@unittest.skipUnless(AI_CLIENT_AVAILABLE, "ai_client module is not available")
+@unittest.skipUnless(get_test_config()['api_key'], "TEST_API_KEY environment variable not set")
+class TestAIClientIntegration(unittest.TestCase):
+    """Integration tests that require actual API access"""
 
     def setUp(self):
         """Set up test client"""
-        # Use Ollama via LiteLLM for integration tests
-        self.model = "ollama_chat/llama3.2"  # Use chat version for better responses
-        self.client = LiteLLMClient(self.model, api_base="http://localhost:11434")
+        config = get_test_config()
+        self.client = AIClient(
+            model=config['model'],
+            api_key=config['api_key'],
+            api_base=config['api_base'],
+            api_type=config['api_type']
+        )
 
     def test_generate_filename_for_meeting_notes(self):
         """Test filename generation for meeting notes content"""
@@ -50,7 +52,7 @@ class TestLiteLLMIntegration(unittest.TestCase):
         prompt = ("Based on the following text, suggest a short, descriptive filename. "
                  "Include an appropriate file extension (.txt, .md, .json, .py, etc.) "
                  "based on the content type. Respond with ONLY the filename, nothing else.\n\n"
-                 f"Text: {content}")
+                 "Text: {content}")
 
         result = self.client.generate_filename(content, prompt)
 
@@ -58,7 +60,7 @@ class TestLiteLLMIntegration(unittest.TestCase):
         self.assertGreater(len(result), 0)
         # Should have some kind of extension
         self.assertIn('.', result)
-        print(f"Generated filename for meeting notes: {result}")
+        print("Generated filename for meeting notes: {}".format(result))
 
     def test_generate_filename_for_code(self):
         """Test filename generation for code content"""
@@ -72,13 +74,13 @@ class TestLiteLLMIntegration(unittest.TestCase):
         prompt = ("Based on the following text, suggest a short, descriptive filename. "
                  "Include an appropriate file extension (.txt, .md, .json, .py, etc.) "
                  "based on the content type. Respond with ONLY the filename, nothing else.\n\n"
-                 f"Text: {content}")
+                 "Text: {content}")
 
         result = self.client.generate_filename(content, prompt)
 
         self.assertIsNotNone(result)
         self.assertGreater(len(result), 0)
-        print(f"Generated filename for code: {result}")
+        print("Generated filename for code: {}".format(result))
         # Should recognize it's code
         self.assertIn('.', result)
 
@@ -96,13 +98,13 @@ class TestLiteLLMIntegration(unittest.TestCase):
         prompt = ("Based on the following text, suggest a short, descriptive filename. "
                  "Include an appropriate file extension (.txt, .md, .json, .py, etc.) "
                  "based on the content type. Respond with ONLY the filename, nothing else.\n\n"
-                 f"Text: {content}")
+                 "Text: {content}")
 
         result = self.client.generate_filename(content, prompt)
 
         self.assertIsNotNone(result)
         self.assertGreater(len(result), 0)
-        print(f"Generated filename for JSON: {result}")
+        print("Generated filename for JSON: {}".format(result))
         # Should recognize JSON format
         self.assertIn('.', result)
 
@@ -123,13 +125,13 @@ class TestLiteLLMIntegration(unittest.TestCase):
         prompt = ("Based on the following text, suggest a short, descriptive filename. "
                  "Include an appropriate file extension (.txt, .md, .json, .py, etc.) "
                  "based on the content type. Respond with ONLY the filename, nothing else.\n\n"
-                 f"Text: {content}")
+                 "Text: {content}")
 
         result = self.client.generate_filename(content, prompt)
 
         self.assertIsNotNone(result)
         self.assertGreater(len(result), 0)
-        print(f"Generated filename for markdown: {result}")
+        print("Generated filename for markdown: {}".format(result))
         self.assertIn('.', result)
 
     def test_with_long_content(self):
@@ -144,23 +146,27 @@ class TestLiteLLMIntegration(unittest.TestCase):
         prompt = ("Based on the following text, suggest a short, descriptive filename. "
                  "Include an appropriate file extension (.txt, .md, .json, .py, etc.) "
                  "based on the content type. Respond with ONLY the filename, nothing else.\n\n"
-                 f"Text: {excerpt}")
+                 "Text: {content}")
 
         result = self.client.generate_filename(excerpt, prompt)
 
         self.assertIsNotNone(result)
         self.assertGreater(len(result), 0)
-        print(f"Generated filename for long content: {result}")
+        print("Generated filename for long content: {}".format(result))
 
 
-@unittest.skipUnless(LITELLM_AVAILABLE, "LiteLLM is not installed")
-class TestLiteLLMNotRunning(unittest.TestCase):
-    """Test behavior when LLM service is not available"""
+@unittest.skipUnless(AI_CLIENT_AVAILABLE, "ai_client module is not available")
+class TestAPIUnavailable(unittest.TestCase):
+    """Test behavior when API service is not available"""
 
-    @unittest.skipIf(is_ollama_running(), "Skip when Ollama is running")
-    def test_graceful_failure_when_service_unavailable(self):
-        """Test that client returns None when service is not accessible"""
-        client = LiteLLMClient("ollama/llama3.2", api_base="http://localhost:11434")
+    def test_graceful_failure_with_invalid_api_base(self):
+        """Test that client returns None when API is not accessible"""
+        client = AIClient(
+            model="gpt-3.5-turbo",
+            api_key="fake-key",
+            api_base="http://localhost:99999",  # Invalid port
+            api_type="chat"
+        )
 
         result = client.generate_filename(
             "Test content",
@@ -168,7 +174,7 @@ class TestLiteLLMNotRunning(unittest.TestCase):
         )
 
         self.assertIsNone(result)
-        print("Correctly returned None when Ollama not running")
+        print("Correctly returned None when API not accessible")
 
 
 if __name__ == '__main__':

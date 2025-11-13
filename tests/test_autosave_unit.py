@@ -1,5 +1,5 @@
-# ABOUTME: Unit tests for AutoSaveWithAI plugin with mocked Ollama API
-# ABOUTME: Tests core functionality without requiring running Ollama instance
+# ABOUTME: Unit tests for AutoSaveWithAI plugin with mocked HTTP client
+# ABOUTME: Tests core functionality without requiring actual API calls
 
 import unittest
 import sys
@@ -13,17 +13,15 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # Mock sublime and sublime_plugin modules before importing
 sys.modules['sublime'] = MagicMock()
 sys.modules['sublime_plugin'] = MagicMock()
-# Mock litellm and openai modules
-sys.modules['litellm'] = MagicMock()
-sys.modules['openai'] = MagicMock()
 
 # Import the functions we want to test
 from AutoSaveWithAI import (
     extract_first_words,
     sanitize_filename,
     get_timestamp_filename,
-    LiteLLMClient
+    AIClient
 )
+import ai_client
 
 
 class TestExtractFirstWords(unittest.TestCase):
@@ -118,19 +116,24 @@ class TestGetTimestampFilename(unittest.TestCase):
         self.assertRegex(result, r'auto-notes-\d{8}-\d{6}\.txt')
 
 
-class TestLiteLLMClient(unittest.TestCase):
-    """Test the LiteLLMClient class"""
+class TestAIClient(unittest.TestCase):
+    """Test the AIClient class"""
 
     def setUp(self):
         """Set up test client"""
-        self.client = LiteLLMClient("gpt-3.5-turbo")
+        self.client = AIClient(
+            model="gpt-3.5-turbo",
+            api_key="test-key",
+            api_base="https://api.openai.com/v1",
+            api_type="chat"
+        )
 
-    @patch('AutoSaveWithAI.LITELLM_AVAILABLE', True)
-    @patch('AutoSaveWithAI.completion')
-    def test_successful_generation(self, mock_completion):
-        """Test successful filename generation"""
+    @patch('AutoSaveWithAI.AI_CLIENT_AVAILABLE', True)
+    @patch('ai_client.chat_completion')
+    def test_successful_generation_chat(self, mock_chat):
+        """Test successful filename generation with Chat Completions API"""
         # Mock successful API response
-        mock_completion.return_value = {
+        mock_chat.return_value = {
             'choices': [{
                 'message': {
                     'content': 'meeting-notes.md'
@@ -144,19 +147,43 @@ class TestLiteLLMClient(unittest.TestCase):
         )
 
         self.assertEqual(result, "meeting-notes.md")
-        # Verify completion was called with correct arguments
-        self.assertTrue(mock_completion.called)
-        call_args = mock_completion.call_args[1]
+        # Verify chat_completion was called with correct arguments
+        self.assertTrue(mock_chat.called)
+        call_args = mock_chat.call_args[1]
         self.assertEqual(call_args['model'], 'gpt-3.5-turbo')
         self.assertEqual(len(call_args['messages']), 1)
         self.assertIn("Generate filename: This is a test", call_args['messages'][0]['content'])
 
-    @patch('AutoSaveWithAI.LITELLM_AVAILABLE', True)
-    @patch('AutoSaveWithAI.completion')
-    def test_authentication_error(self, mock_completion):
+    @patch('AutoSaveWithAI.AI_CLIENT_AVAILABLE', True)
+    @patch('ai_client.responses_create')
+    def test_successful_generation_responses(self, mock_responses):
+        """Test successful filename generation with Responses API"""
+        # Mock successful API response
+        mock_responses.return_value = {
+            'output_text': 'meeting-notes.md'
+        }
+
+        client = AIClient(
+            model="gpt-4o",
+            api_key="test-key",
+            api_base="https://api.openai.com/v1",
+            api_type="responses"
+        )
+
+        result = client.generate_filename(
+            "This is a test",
+            "Generate filename: {content}"
+        )
+
+        self.assertEqual(result, "meeting-notes.md")
+        # Verify responses_create was called
+        self.assertTrue(mock_responses.called)
+
+    @patch('AutoSaveWithAI.AI_CLIENT_AVAILABLE', True)
+    @patch('ai_client.chat_completion')
+    def test_authentication_error(self, mock_chat):
         """Test handling of authentication error"""
-        # Create a mock AuthenticationError
-        mock_completion.side_effect = Exception("Invalid API key")
+        mock_chat.side_effect = ai_client.OpenAIHTTPError("HTTP 401: Unauthorized")
 
         result = self.client.generate_filename(
             "This is a test",
@@ -165,11 +192,11 @@ class TestLiteLLMClient(unittest.TestCase):
 
         self.assertIsNone(result)
 
-    @patch('AutoSaveWithAI.LITELLM_AVAILABLE', True)
-    @patch('AutoSaveWithAI.completion')
-    def test_api_timeout(self, mock_completion):
+    @patch('AutoSaveWithAI.AI_CLIENT_AVAILABLE', True)
+    @patch('ai_client.chat_completion')
+    def test_api_timeout(self, mock_chat):
         """Test handling of API timeout"""
-        mock_completion.side_effect = Exception("Timeout")
+        mock_chat.side_effect = Exception("Timeout")
 
         result = self.client.generate_filename(
             "This is a test",
@@ -178,11 +205,11 @@ class TestLiteLLMClient(unittest.TestCase):
 
         self.assertIsNone(result)
 
-    @patch('AutoSaveWithAI.LITELLM_AVAILABLE', True)
-    @patch('AutoSaveWithAI.completion')
-    def test_api_connection_error(self, mock_completion):
+    @patch('AutoSaveWithAI.AI_CLIENT_AVAILABLE', True)
+    @patch('ai_client.chat_completion')
+    def test_api_connection_error(self, mock_chat):
         """Test handling of connection error"""
-        mock_completion.side_effect = Exception("Connection refused")
+        mock_chat.side_effect = Exception("Connection refused")
 
         result = self.client.generate_filename(
             "This is a test",
@@ -191,9 +218,9 @@ class TestLiteLLMClient(unittest.TestCase):
 
         self.assertIsNone(result)
 
-    @patch('AutoSaveWithAI.LITELLM_AVAILABLE', False)
-    def test_litellm_not_available(self):
-        """Test handling when litellm is not installed"""
+    @patch('AutoSaveWithAI.AI_CLIENT_AVAILABLE', False)
+    def test_ai_client_not_available(self):
+        """Test handling when ai_client module is not available"""
         result = self.client.generate_filename(
             "This is a test",
             "Generate filename: {content}"
@@ -201,11 +228,33 @@ class TestLiteLLMClient(unittest.TestCase):
 
         self.assertIsNone(result)
 
-    @patch('AutoSaveWithAI.LITELLM_AVAILABLE', True)
-    @patch('AutoSaveWithAI.completion')
-    def test_with_api_key(self, mock_completion):
-        """Test that API key is passed correctly"""
-        mock_completion.return_value = {
+    def test_no_api_key(self):
+        """Test handling when no API key is provided"""
+        client = AIClient(
+            model="gpt-4",
+            api_key=None,
+            api_base="https://api.openai.com/v1"
+        )
+        result = client.generate_filename("Test", "Generate: {content}")
+
+        self.assertIsNone(result)
+
+    def test_no_api_base(self):
+        """Test handling when no API base is provided"""
+        client = AIClient(
+            model="gpt-4",
+            api_key="test-key",
+            api_base=None
+        )
+        result = client.generate_filename("Test", "Generate: {content}")
+
+        self.assertIsNone(result)
+
+    @patch('AutoSaveWithAI.AI_CLIENT_AVAILABLE', True)
+    @patch('ai_client.chat_completion')
+    def test_with_custom_auth(self, mock_chat):
+        """Test that custom auth headers are passed correctly"""
+        mock_chat.return_value = {
             'choices': [{
                 'message': {
                     'content': 'test.txt'
@@ -213,31 +262,20 @@ class TestLiteLLMClient(unittest.TestCase):
             }]
         }
 
-        client = LiteLLMClient("gpt-4", api_key="test-key-123")
+        client = AIClient(
+            model="gpt-4",
+            api_key="azure-key",
+            api_base="https://azure.openai.com/v1",
+            api_type="chat",
+            auth_header_name="api-key",
+            auth_header_prefix=""
+        )
         result = client.generate_filename("Test", "Generate: {content}")
 
         self.assertEqual(result, "test.txt")
-        call_args = mock_completion.call_args[1]
-        self.assertEqual(call_args['api_key'], "test-key-123")
-
-    @patch('AutoSaveWithAI.LITELLM_AVAILABLE', True)
-    @patch('AutoSaveWithAI.completion')
-    def test_with_api_base(self, mock_completion):
-        """Test that API base is passed correctly"""
-        mock_completion.return_value = {
-            'choices': [{
-                'message': {
-                    'content': 'test.txt'
-                }
-            }]
-        }
-
-        client = LiteLLMClient("gpt-4", api_base="http://localhost:8000")
-        result = client.generate_filename("Test", "Generate: {content}")
-
-        self.assertEqual(result, "test.txt")
-        call_args = mock_completion.call_args[1]
-        self.assertEqual(call_args['api_base'], "http://localhost:8000")
+        call_args = mock_chat.call_args[1]
+        self.assertEqual(call_args['auth_header_name'], "api-key")
+        self.assertEqual(call_args['auth_header_prefix'], "")
 
 
 if __name__ == '__main__':
